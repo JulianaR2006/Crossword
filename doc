@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Birthday Crossword</title>
+  <style>
+    :root{
+      --bg:#0b0b10;
+      --panel:#12121a;
+      --ink:#f4f4f6;
+      --muted:#a7a7b2;
+      --border:rgba(255,255,255,.10);
+      --accent:#ffffff;
+      --bad:#ff5a5f;
+      --good:#4cd964;
+      --cell:38px;
+      --radius:18px;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    }
+    body{
+      margin:0;
+      background: radial-gradient(1200px 800px at 20% 10%, rgba(255,255,255,.08), transparent 60%),
+                  radial-gradient(900px 600px at 90% 40%, rgba(255,255,255,.06), transparent 55%),
+                  var(--bg);
+      color:var(--ink);
+    }
+    .wrap{
+      max-width:1100px;
+      margin:0 auto;
+      padding:28px 16px 44px;
+      display:grid;
+      grid-template-columns: 1fr 360px;
+      gap:18px;
+    }
+    header{
+      grid-column:1/-1;
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:16px;
+      margin-bottom:6px;
+    }
+    h1{ margin:0; font-size:22px; letter-spacing:.2px; }
+    .sub{ color:var(--muted); font-size:13px; margin-top:6px; }
+    .panel{
+      background:linear-gradient(180deg, rgba(255,255,255,.06), transparent 35%),
+                 rgba(255,255,255,.04);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      padding:16px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.35);
+    }
+
+    /* Crossword grid */
+    #grid{
+      display:grid;
+      grid-template-columns: repeat(var(--cols), var(--cell));
+      grid-template-rows: repeat(var(--rows), var(--cell));
+      gap:6px;
+      justify-content:start;
+      padding:6px;
+      border-radius: 14px;
+      background: rgba(0,0,0,.22);
+      border:1px solid var(--border);
+      overflow:auto;
+    }
+    .cell{
+      position:relative;
+      width:var(--cell);
+      height:var(--cell);
+      border-radius: 10px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.10);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .cell.block{
+      background: rgba(255,255,255,.02);
+      border:1px solid rgba(255,255,255,.05);
+    }
+    .cell input{
+      width:100%;
+      height:100%;
+      border:0;
+      outline:none;
+      background:transparent;
+      color:var(--ink);
+      text-transform:uppercase;
+      font-size:18px;
+      font-weight:600;
+      text-align:center;
+      caret-color: transparent;
+    }
+    .cell .num{
+      position:absolute;
+      top:4px;
+      left:6px;
+      font-size:10px;
+      color:rgba(255,255,255,.70);
+      pointer-events:none;
+      user-select:none;
+    }
+    .cell.bad{
+      border-color: rgba(255,90,95,.65);
+      box-shadow: 0 0 0 2px rgba(255,90,95,.18) inset;
+    }
+    .cell.good{
+      border-color: rgba(76,217,100,.55);
+      box-shadow: 0 0 0 2px rgba(76,217,100,.14) inset;
+    }
+
+    /* Clues */
+    .clueCols{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+    .clueBox h2{
+      margin:0 0 8px;
+      font-size:14px;
+      letter-spacing:.2px;
+      color: rgba(255,255,255,.92);
+    }
+    .clues{
+      margin:0;
+      padding-left:18px;
+      color: var(--muted);
+      font-size:13px;
+      line-height:1.35;
+    }
+    .clues li{ margin:6px 0; }
+    .toolbar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:12px;
+      align-items:center;
+    }
+    button{
+      appearance:none;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color: var(--ink);
+      padding:10px 12px;
+      border-radius: 12px;
+      font-weight:600;
+      cursor:pointer;
+    }
+    button:hover{ background: rgba(255,255,255,.09); }
+    .hint{ font-size:12px; color: var(--muted); margin-top:10px; }
+
+    /* Win modal */
+    .overlay{
+      position:fixed;
+      inset:0;
+      background: rgba(0,0,0,.65);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:50;
+      padding:18px;
+    }
+    .overlay.show{ display:flex; }
+    .modal{
+      width:min(720px, 100%);
+      border-radius: 22px;
+      border:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      box-shadow: 0 25px 80px rgba(0,0,0,.55);
+      padding:18px;
+      position:relative;
+      overflow:hidden;
+    }
+    .modal h3{
+      margin:0;
+      font-size:30px;
+      letter-spacing:.3px;
+      text-transform:lowercase;
+    }
+    .modal p{
+      margin:10px 0 16px;
+      color: rgba(255,255,255,.80);
+    }
+    .modalActions{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .letterBtn{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding:12px 14px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.10);
+    }
+    .letterBtn svg{ width:22px; height:22px; }
+    .closeX{
+      position:absolute;
+      top:12px;
+      right:12px;
+      width:40px;
+      height:40px;
+      border-radius: 14px;
+    }
+
+    /* Letter modal */
+    .letterOverlay{
+      position:fixed;
+      inset:0;
+      background: rgba(0,0,0,.78);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:60;
+      padding:18px;
+    }
+    .letterOverlay.show{ display:flex; }
+    .letterCard{
+      width:min(820px, 100%);
+      max-height: 86vh;
+      overflow:auto;
+      border-radius: 22px;
+      border:1px solid var(--border);
+      background: rgba(10,10,14,.95);
+      box-shadow: 0 25px 80px rgba(0,0,0,.65);
+      padding:22px 20px;
+    }
+    .letterCard h4{ margin:0 0 10px; font-size:18px; }
+    .letterBody{
+      color: rgba(255,255,255,.85);
+      line-height:1.55;
+      font-size:14.5px;
+      white-space: pre-wrap;
+    }
+    .letterTop{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      margin-bottom:10px;
+    }
+
+    /* Confetti canvas */
+    #confetti{
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      z-index:55;
+      display:none;
+    }
+    #confetti.show{ display:block; }
+
+    @media (max-width: 980px){
+      .wrap{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="confetti"></canvas>
+
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Birthday Crossword</h1>
+        <div class="sub">Finish it to unlock the surprise 💌</div>
+      </div>
+      <div class="sub" id="status"></div>
+    </header>
+
+    <div class="panel">
+      <div id="grid" aria-label="Crossword grid"></div>
+      <div class="toolbar">
+        <button id="checkBtn" type="button">Check</button>
+        <button id="clearBtn" type="button">Clear</button>
+      </div>
+      <div class="hint">Tip: click a square, type letters. Arrow keys move. Backspace goes back.</div>
+    </div>
+
+    <aside class="panel">
+      <div class="clueCols">
+        <div class="clueBox">
+          <h2>Across</h2>
+          <ol class="clues" id="across"></ol>
+        </div>
+        <div class="clueBox">
+          <h2>Down</h2>
+          <ol class="clues" id="down"></ol>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- WIN MODAL -->
+  <div class="overlay" id="winOverlay" role="dialog" aria-modal="true">
+    <div class="modal">
+      <button class="closeX" id="winClose" type="button">✕</button>
+      <h3>happy birthday shanu!!</h3>
+      <p>You solved it 🎉</p>
+      <div class="modalActions">
+        <button class="letterBtn" id="openLetter" type="button" aria-label="Open letter">
+          <!-- envelope icon -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 6h16v12H4z"/>
+            <path d="m4 7 8 6 8-6"/>
+          </svg>
+          Open your letter
+        </button>
+        <button id="keepConfetti" type="button">More confetti</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LETTER MODAL -->
+  <div class="letterOverlay" id="letterOverlay" role="dialog" aria-modal="true">
+    <div class="letterCard">
+      <div class="letterTop">
+        <h4>My letter 💌</h4>
+        <button id="letterClose" type="button">Close</button>
+      </div>
+      <div class="letterBody" id="letterBody"></div>
+    </div>
+  </div>
+
+<script>
+/**
+ * =========================
+ * 1) EDIT THIS SECTION ONLY
+ * =========================
+ * Put your crossword answers + clues here.
+ * Answers must be A-Z only (no spaces/punctuation). Use underscores? No—just remove spaces.
+ *
+ * Example:
+ * { answer: "SHANU", clue: "The birthday boy", directionHint: "across" } // directionHint optional
+ */
+const PUZZLE = [
+   { answer: "EACH", clue: "The 20th word on Messi's caption for his post on December 20th, 2025" },
+  { answer: "PONY", clue: "The particular nickname Nati used on her Happy birthday message she sent you today at 00:01" },
+  { answer: "HAPPY", clue: "Most basic emotion ever" },
+  { answer: "LATER", clue: "Last word on the last test I sent you on whatsapp" },
+  { answer: "PAST", clue: "The caption on your latest post" },
+  { answer: "BIRTHDAY", clue: "What's yours today! January 5th every year!" },
+  { answer: "AB", clue: "The third friend of yours on the video you sent me" },
+  { answer: "IMAGINAS", clue: "Third word on the title of the first song on my Spotify playlist about you" },
+  { answer: "HIGHEST", clue: "First word on the title on Trump's post of November 22, 2025" },
+  { answer: "AUGUST", clue: "Month when my Lover posted a pic (while we weren't talking) when instead he Should've Come Over" },
+  { answer: "PHEGMATIC", clue: "9th word on the Indian-Argentinian Dictionary" },
+  { answer: "LEINAD", clue: "The fourth friend on the video you sent me, but his name written backwards" },
+  { answer: "TE_AMO", clue: "First phrase on your message on Saturday, Dec 27, which you texted after I texted \"that's the one thing I don't miss\"" },
+  { answer: "SHANU", clue: "The nickname of the most wonderful man I've ever met" },
+  { answer: "UMD", clue: "The university we're going to together next fall!" }
+];
+
+/**
+ * Paste your letter here (you will write it).
+ * You can use line breaks. Emojis ok.
+ */
+const LETTER_TEXT = `Hi Shanu,
+
+Last year, which was sooo long ago, your spotify said your age was 77 years old (or something like that). When you told me that I pictured you as an old man, holding a physical newspaper just like old men do, filling crosswords. Being 
+
+Love,
+Juliana`;
+
+/**
+ * The win message (requested exact text):
+ */
+const WIN_TEXT = "happy birthday shanu!!";
+
+/* =========================
+ * End of edit section
+ * ========================= */
+
+
+// --- Simple crossword generator (greedy overlap placement) ---
+const MAX_ROWS = 15;
+const MAX_COLS = 15;
+
+function cleanAnswer(s){
+  return (s || "")
+    .toUpperCase()
+    .replace(/[^A-Z]/g,""); // remove spaces/punct
+}
+
+const words = PUZZLE
+  .map(w => ({...w, answer: cleanAnswer(w.answer)}))
+  .filter(w => w.answer.length >= 2)
+  .sort((a,b)=> b.answer.length - a.answer.length);
+
+if(words.length === 0){
+  alert("Add at least one word to PUZZLE in the code.");
+}
+
+const grid = Array.from({length: MAX_ROWS}, () => Array(MAX_COLS).fill(null)); // null or {ch, solution, num?}
+const placed = []; // {word, row, col, dir:'across'|'down'}
+
+function inBounds(r,c){ return r>=0 && r<MAX_ROWS && c>=0 && c<MAX_COLS; }
+
+function canPlace(word, r, c, dir){
+  const dr = dir === "down" ? 1 : 0;
+  const dc = dir === "across" ? 1 : 0;
+
+  // word must fit
+  const endR = r + dr*(word.length-1);
+  const endC = c + dc*(word.length-1);
+  if(!inBounds(r,c) || !inBounds(endR,endC)) return {ok:false};
+
+  // check cells
+  let overlaps = 0;
+  for(let i=0;i<word.length;i++){
+    const rr = r + dr*i;
+    const cc = c + dc*i;
+    const cell = grid[rr][cc];
+    if(cell && cell.solution !== word[i]) return {ok:false};
+    if(cell && cell.solution === word[i]) overlaps++;
+  }
+
+  // don't allow adjacent conflicts (basic crossword rule)
+  for(let i=0;i<word.length;i++){
+    const rr = r + dr*i;
+    const cc = c + dc*i;
+
+    // perpendicular neighbors must be empty unless overlapping at this cell
+    const left = inBounds(rr,cc-1) ? grid[rr][cc-1] : null;
+    const right = inBounds(rr,cc+1) ? grid[rr][cc+1] : null;
+    const up = inBounds(rr-1,cc) ? grid[rr-1][cc] : null;
+    const down = inBounds(rr+1,cc) ? grid[rr+1][cc] : null;
+
+    if(dir === "across"){
+      // check up/down neighbors
+      if(up && !grid[rr][cc]) return {ok:false};
+      if(down && !grid[rr][cc]) return {ok:false};
+    }else{
+      // down: check left/right neighbors
+      if(left && !grid[rr][cc]) return {ok:false};
+      if(right && !grid[rr][cc]) return {ok:false};
+    }
+  }
+
+  // cells before and after word should be empty
+  const beforeR = r - dr;
+  const beforeC = c - dc;
+  const afterR = endR + dr;
+  const afterC = endC + dc;
+  if(inBounds(beforeR,beforeC) && grid[beforeR][beforeC]) return {ok:false};
+  if(inBounds(afterR,afterC) && grid[afterR][afterC]) return {ok:false};
+
+  return {ok:true, overlaps};
+}
+
+function placeWord(wordObj, r, c, dir){
+  const w = wordObj.answer;
+  const dr = dir === "down" ? 1 : 0;
+  const dc = dir === "across" ? 1 : 0;
+
+  for(let i=0;i<w.length;i++){
+    const rr = r + dr*i;
+    const cc = c + dc*i;
+    if(!grid[rr][cc]) grid[rr][cc] = { solution: w[i], entry: "" };
+  }
+  placed.push({ word: wordObj, row:r, col:c, dir });
+}
+
+function tryGenerate(){
+  // first word centered
+  const first = words[0];
+  const startR = Math.floor(MAX_ROWS/2);
+  const startC = Math.floor((MAX_COLS - first.answer.length)/2);
+  placeWord(first, startR, Math.max(0,startC), "across");
+
+  for(let idx=1; idx<words.length; idx++){
+    const w = words[idx].answer;
+    let best = null;
+
+    // try to overlap with any existing letter
+    for(const p of placed){
+      const pw = p.word.answer;
+      for(let i=0;i<w.length;i++){
+        const ch = w[i];
+        for(let j=0;j<pw.length;j++){
+          if(pw[j] !== ch) continue;
+
+          const pr = p.row + (p.dir==="down"? j : 0);
+          const pc = p.col + (p.dir==="across"? j : 0);
+
+          // perpendicular placement crossing at (pr,pc)
+          const dir = (p.dir === "across") ? "down" : "across";
+          const r = pr - (dir==="down"? i : 0);
+          const c = pc - (dir==="across"? i : 0);
+
+          const test = canPlace(w, r, c, dir);
+          if(test.ok){
+            const score = test.overlaps * 10 - (Math.abs(r-startR)+Math.abs(c-Math.floor(MAX_COLS/2)));
+            if(!best || score > best.score){
+              best = {r,c,dir,score};
+            }
+          }
+        }
+      }
+    }
+
+    // fallback: scan for any open spot
+    if(!best){
+      outer:
+      for(let r=0;r<MAX_ROWS;r++){
+        for(let c=0;c<MAX_COLS;c++){
+          for(const dir of ["across","down"]){
+            const test = canPlace(w, r, c, dir);
+            if(test.ok && test.overlaps === 0){
+              best = {r,c,dir,score:0};
+              break outer;
+            }
+          }
+        }
+      }
+    }
+
+    if(best) placeWord(words[idx], best.r, best.c, best.dir);
+    // if cannot place, skip word (keeps site usable)
+  }
+}
+
+tryGenerate();
+
+// --- Numbering + clue lists (across/down starts) ---
+function isBlock(r,c){ return !grid[r][c]; }
+function startsAcross(r,c){
+  if(isBlock(r,c)) return false;
+  const leftBlock = (c===0) || isBlock(r,c-1);
+  const hasRight = (c+1<MAX_COLS) && !isBlock(r,c+1);
+  return leftBlock && hasRight;
+}
+function startsDown(r,c){
+  if(isBlock(r,c)) return false;
+  const upBlock = (r===0) || isBlock(r-1,c);
+  const hasDown = (r+1<MAX_ROWS) && !isBlock(r+1,c);
+  return upBlock && hasDown;
+}
+
+let number = 1;
+const starts = []; // {num,r,c,across?,down?}
+for(let r=0;r<MAX_ROWS;r++){
+  for(let c=0;c<MAX_COLS;c++){
+    const a = startsAcross(r,c);
+    const d = startsDown(r,c);
+    if(a || d){
+      if(grid[r][c]) grid[r][c].num = number;
+      starts.push({num:number, r, c, a, d});
+      number++;
+    }
+  }
+}
+
+// Map placed words to numbered clues
+function findWordStartForPlacement(pl){
+  return starts.find(s => s.r === pl.row && s.c === pl.col && ((pl.dir==="across" && s.a) || (pl.dir==="down" && s.d)));
+}
+
+const acrossClues = [];
+const downClues = [];
+for(const pl of placed){
+  const st = findWordStartForPlacement(pl);
+  if(!st) continue;
+  const entry = { num: st.num, clue: pl.word.clue, answer: pl.word.answer, row:pl.row, col:pl.col, dir:pl.dir };
+  if(pl.dir === "across") acrossClues.push(entry);
+  else downClues.push(entry);
+}
+acrossClues.sort((x,y)=>x.num-y.num);
+downClues.sort((x,y)=>x.num-y.num);
+
+// --- Render UI ---
+const gridEl = document.getElementById("grid");
+document.documentElement.style.setProperty("--rows", MAX_ROWS);
+document.documentElement.style.setProperty("--cols", MAX_COLS);
+
+const inputs = new Map(); // key "r,c" -> input
+function key(r,c){ return `${r},${c}`; }
+
+for(let r=0;r<MAX_ROWS;r++){
+  for(let c=0;c<MAX_COLS;c++){
+    const cell = document.createElement("div");
+    cell.className = "cell" + (isBlock(r,c) ? " block" : "");
+    cell.dataset.r = r;
+    cell.dataset.c = c;
+
+    if(!isBlock(r,c)){
+      if(grid[r][c].num){
+        const numEl = document.createElement("div");
+        numEl.className = "num";
+        numEl.textContent = grid[r][c].num;
+        cell.appendChild(numEl);
+      }
+      const inp = document.createElement("input");
+      inp.maxLength = 1;
+      inp.autocomplete = "off";
+      inp.spellcheck = false;
+      inp.inputMode = "text";
+      inp.ariaLabel = `Row ${r+1} column ${c+1}`;
+      cell.appendChild(inp);
+      inputs.set(key(r,c), inp);
+    }
+    gridEl.appendChild(cell);
+  }
+}
+
+function setStatus(msg){
+  document.getElementById("status").textContent = msg || "";
+}
+
+function nextCell(r,c,dr,dc){
+  let rr=r+dr, cc=c+dc;
+  while(inBounds(rr,cc) && isBlock(rr,cc)){
+    rr+=dr; cc+=dc;
+  }
+  return inBounds(rr,cc) ? {r:rr,c:cc} : null;
+}
+
+// typing behavior: default move right; arrows move; backspace goes left
+for(const [k, inp] of inputs.entries()){
+  const [r,c] = k.split(",").map(Number);
+
+  inp.addEventListener("input", (e)=>{
+    const v = inp.value.toUpperCase().replace(/[^A-Z]/g,"");
+    inp.value = v;
+    // move right if typed
+    if(v){
+      const n = nextCell(r,c,0,1) || nextCell(r,c,1,0);
+      if(n) inputs.get(key(n.r,n.c))?.focus();
+    }
+  });
+
+  inp.addEventListener("keydown", (e)=>{
+    if(e.key === "Backspace"){
+      if(inp.value){
+        inp.value = "";
+      } else {
+        const p = nextCell(r,c,0,-1) || nextCell(r,c,-1,0);
+        if(p) inputs.get(key(p.r,p.c))?.focus();
+      }
+      e.preventDefault();
+    }
+    if(e.key === "ArrowRight"){
+      const n = nextCell(r,c,0,1); if(n) inputs.get(key(n.r,n.c))?.focus();
+      e.preventDefault();
+    }
+    if(e.key === "ArrowLeft"){
+      const n = nextCell(r,c,0,-1); if(n) inputs.get(key(n.r,n.c))?.focus();
+      e.preventDefault();
+    }
+    if(e.key === "ArrowDown"){
+      const n = nextCell(r,c,1,0); if(n) inputs.get(key(n.r,n.c))?.focus();
+      e.preventDefault();
+    }
+    if(e.key === "ArrowUp"){
+      const n = nextCell(r,c,-1,0); if(n) inputs.get(key(n.r,n.c))?.focus();
+      e.preventDefault();
+    }
+    if(e.key === "Enter"){
+      checkAndMaybeWin(true);
+    }
+  });
+}
+
+// Clues render
+function renderClues(list, elId){
+  const el = document.getElementById(elId);
+  el.innerHTML = "";
+  for(const item of list){
+    const li = document.createElement("li");
+    li.innerHTML = `<strong style="color:rgba(255,255,255,.92)">${item.num}.</strong> ${escapeHtml(item.clue || "")}`;
+    li.style.cursor = "pointer";
+    li.addEventListener("click", ()=>{
+      inputs.get(key(item.row,item.col))?.focus();
+    });
+    el.appendChild(li);
+  }
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+renderClues(acrossClues, "across");
+renderClues(downClues, "down");
+
+// Letter
+document.getElementById("letterBody").textContent = LETTER_TEXT;
+
+// Buttons
+document.getElementById("clearBtn").addEventListener("click", ()=>{
+  for(const inp of inputs.values()) inp.value = "";
+  clearMarks();
+  setStatus("");
+});
+
+document.getElementById("checkBtn").addEventListener("click", ()=>{
+  checkAndMaybeWin(true);
+});
+
+function clearMarks(){
+  document.querySelectorAll(".cell.good,.cell.bad").forEach(c=>{
+    c.classList.remove("good","bad");
+  });
+}
+
+// Check solution
+function checkAndMaybeWin(markCells){
+  let filled = 0, total = 0, correct = 0;
+
+  for(let r=0;r<MAX_ROWS;r++){
+    for(let c=0;c<MAX_COLS;c++){
+      if(isBlock(r,c)) continue;
+      total++;
+      const inp = inputs.get(key(r,c));
+      const entered = (inp?.value || "").toUpperCase();
+      const sol = grid[r][c].solution;
+      if(entered) filled++;
+      if(entered && entered === sol) correct++;
+
+      if(markCells){
+        const cellEl = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+        cellEl.classList.remove("good","bad");
+        if(entered){
+          cellEl.classList.add(entered === sol ? "good" : "bad");
+        }
+      }
+    }
+  }
+
+  setStatus(`${filled}/${total} filled • ${correct}/${total} correct`);
+
+  const solved = (correct === total) && (filled === total);
+  if(solved) win();
+}
+
+function win(){
+  // show win modal + confetti
+  document.querySelector("#winOverlay h3").textContent = WIN_TEXT;
+  document.getElementById("winOverlay").classList.add("show");
+  startConfetti(1800);
+}
+
+// Win modal actions
+document.getElementById("winClose").addEventListener("click", ()=>{
+  document.getElementById("winOverlay").classList.remove("show");
+});
+document.getElementById("openLetter").addEventListener("click", ()=>{
+  document.getElementById("letterOverlay").classList.add("show");
+});
+document.getElementById("letterClose").addEventListener("click", ()=>{
+  document.getElementById("letterOverlay").classList.remove("show");
+});
+document.getElementById("keepConfetti").addEventListener("click", ()=>{
+  startConfetti(2000);
+});
+
+// --- Confetti (no libraries) ---
+const canvas = document.getElementById("confetti");
+const ctx = canvas.getContext("2d");
+let confettiParts = [];
+let confettiRAF = null;
+function resize(){
+  canvas.width = window.innerWidth * devicePixelRatio;
+  canvas.height = window.innerHeight * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+function rand(min,max){ return Math.random()*(max-min)+min; }
+
+function startConfetti(ms=1500){
+  canvas.classList.add("show");
+  const now = performance.now();
+  const end = now + ms;
+
+  // seed
+  const count = 220;
+  confettiParts = Array.from({length:count}, ()=>({
+    x: rand(0, window.innerWidth),
+    y: rand(-window.innerHeight, 0),
+    vx: rand(-2.5, 2.5),
+    vy: rand(2, 6),
+    r: rand(3, 7),
+    a: rand(0, Math.PI*2),
+    va: rand(-.2,.2),
+    // monochrome-ish elegant confetti (still “confetti” but classy)
+    shade: rand(180,255),
+    life: rand(0.6, 1.2)
+  }));
+
+  function frame(t){
+    ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+
+    for(const p of confettiParts){
+      p.x += p.vx;
+      p.y += p.vy;
+      p.a += p.va;
+      p.vy += 0.03; // gravity
+
+      // wrap
+      if(p.y > window.innerHeight + 20) p.y = rand(-120, -20);
+      if(p.x < -20) p.x = window.innerWidth + 20;
+      if(p.x > window.innerWidth + 20) p.x = -20;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.a);
+      const s = p.shade;
+      ctx.fillStyle = `rgba(${s},${s},${s},0.9)`;
+      ctx.fillRect(-p.r, -p.r/2, p.r*2, p.r);
+      ctx.restore();
+    }
+
+    if(t < end){
+      confettiRAF = requestAnimationFrame(frame);
+    } else {
+      // fade out quickly
+      setTimeout(()=>{
+        canvas.classList.remove("show");
+        ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+        if(confettiRAF) cancelAnimationFrame(confettiRAF);
+      }, 250);
+    }
+  }
+
+  if(confettiRAF) cancelAnimationFrame(confettiRAF);
+  confettiRAF = requestAnimationFrame(frame);
+}
+
+// Autofocus first non-block cell
+for(let r=0;r<MAX_ROWS;r++){
+  for(let c=0;c<MAX_COLS;c++){
+    if(!isBlock(r,c)){
+      inputs.get(key(r,c))?.focus();
+      r=MAX_ROWS; break;
+    }
+  }
+}
+</script>
+</body>
+</html>
